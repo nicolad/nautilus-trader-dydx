@@ -2,6 +2,16 @@
 
 This repository provides code and documentation for integrating dYdX with Nautilus Trader.
 
+## dYdX API Components
+
+The dYdX exchange exposes multiple APIs that serve distinct purposes:
+
+- **HTTP (REST)** – used for retrieving historical market data and instrument metadata.
+- **WebSocket** – provides streaming market data so clients can watch real-time order book updates and ticker changes.
+- **gRPC** – required for submitting orders and requesting fee rates.
+
+At present the project includes basic clients for each of these protocols. Future work will replace the current Python adapter with a set of strongly typed Rust implementations.
+
 ## Implementation Plan
 
 Below is a high-level TODO list for the planned work:

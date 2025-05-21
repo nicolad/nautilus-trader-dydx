@@ -9,6 +9,13 @@ This file tracks tasks required to implement a Rust-based adapter for NautilusTr
 - **Execution Client**: handle order submission, modification, cancellation, and report generation.
 - **Configuration**: define settings required by the Rust clients (API keys, base URLs, etc.).
 
+## dYdX API Notes
+- The existing adapter already includes three transport clients:
+  - **HTTP** for historical data and instrument metadata.
+  - **WebSocket** for real-time market data streams.
+  - **gRPC** for submitting orders and querying fee rates.
+  These clients will be replaced with typed Rust equivalents during the port.
+
 ## Porting Steps
 1. Create Rust crates for the clients above, following existing Python interfaces.
 2. Reuse strongly typed transport clients from Phase 1 for HTTP/WebSocket/gRPC.

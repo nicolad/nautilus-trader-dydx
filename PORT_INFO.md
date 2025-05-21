@@ -8,6 +8,13 @@ The README outlines a three-phase approach:
 2. **Python Bridge & Market-Data Path** – expose Rust clients to Python via `pyo3` and route the `MarketDataClient` through the Rust implementation, transparently for users.
 3. **Full Adapter in Rust** – re-implement `InstrumentProvider`, `DataClient`, and `ExecutionClient` in Rust, refactor order submission methods, and run latency and soak tests.
 
+### Existing dYdX Clients
+The current adapter already provides three separate transport clients:
+- **HTTP** – used for historical data queries and instrument metadata.
+- **WebSocket** – streams market data such as order book updates.
+- **gRPC** – required for order submission and fee rate requests.
+These will be replaced by strongly typed Rust equivalents as work progresses.
+
 ## References and Links
 - The README indicates that this repository integrates dYdX with Nautilus Trader.
 - Commit `84738a4` references a merge of pull request `#1` titled "Add basic implementation plan".
