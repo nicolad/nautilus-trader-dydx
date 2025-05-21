@@ -380,3 +380,216 @@ and provide a more detailed breakdown of the work ahead.
 These items outline the Rust-focused path to complete the dYdX integration.
 
 
+## dYdX v4 × Nautilus-Trader Adapter — **Technical Field-Guide** (Markdown Edition)
+
+<sup>Everything you need, with **extra links** to every primary doc page.</sup>
+
+---
+
+## 📌 Road-map (where each phase touches dYdX)
+
+| Phase                         | Deliverable                                           | dYdX resource(s) you need to wrap    | Outcome                                          |                                                    |
+| ----------------------------- | ----------------------------------------------------- | ------------------------------------ | ------------------------------------------------ | -------------------------------------------------- |
+| 1 – Typed *transport* clients | Rust HTTP, WS & gRPC clients                          | Indexer REST & WS, full-node gRPC/WS | Lowest-latency market-data path                  |                                                    |
+| 2 – Python bridge             | Thin `pyo3` layer                                     | Same transports                      | Existing Python adapter transparently calls Rust |                                                    |
+| 3 – Full Rust adapter         | `InstrumentProvider`, `DataClient`, `ExecutionClient` | All three transports                 | End-to-end Rust in critical path                 | ([docs.dydx.exchange][1], [docs.dydx.exchange][2]) |
+
+---
+
+## 1  Public deployments & status pages
+
+| Deployment  | REST base                              | WS base                                       | Notes                               |                                                    |
+| ----------- | -------------------------------------- | --------------------------------------------- | ----------------------------------- | -------------------------------------------------- |
+| **Mainnet** | `https://indexer.dydx.trade/v4`        | `wss://indexer.dydx.trade/v4/ws`              | Run by DYDX token-holder governance |                                                    |
+| **Testnet** | `https://dydx-testnet.imperator.co/v4` | `wss://indexer.v4testnet.dydx.exchange/v4/ws` | All docs examples use this cluster  | ([docs.dydx.exchange][1], [docs.dydx.exchange][2]) |
+
+---
+
+## 2  Transport layers in depth
+
+### 2.1  Indexer **REST** (OpenAPI)
+
+*Base URL → see table above*
+
+| Path                     | Purpose                              |                           |
+| ------------------------ | ------------------------------------ | ------------------------- |
+| `GET /perpetualMarkets`  | Instrument list, tick-size, lot-size |                           |
+| `GET /candles?marketId=` | 1 s → 1 d OHLCV                      |                           |
+| `GET /trades?marketId=`  | Historical fills (L2)                |                           |
+| `GET /orders/{id}`       | Order life-cycle audit trail         | ([docs.dydx.exchange][1]) |
+
+---
+
+### 2.2  Indexer **WebSocket**
+
+```jsonc
+// generic subscribe frame
+{
+  "type":    "subscribe",
+  "channel": "v4_orderbooks",
+  "id":      "BTC-USD"
+}
+```
+
+* Hand-shake returns `{type:"connected", connection_id}`
+* Heart-beat → ping every 30 s, expect pong in ≤10 s
+* Core channels: `v4_orderbooks`, `v4_trades`, `v4_subaccounts`, `v4_markets`
+* WS rate-limit: **2 subs / (conn+channel+id) / s** and **2 invalid messages / s** ([docs.dydx.exchange][2])
+
+---
+
+### 2.3  Full-node **gRPC & low-latency WS** stream
+
+Enable in `config.toml` / CLI:
+
+```bash
+--grpc-streaming-enabled=true
+--grpc-streaming-flush-interval-ms=50
+--websocket-streaming-enabled=true
+--websocket-streaming-port=9092
+```
+
+Subscribe with `StreamOrderbookUpdatesRequest { clob_pair_id[], subaccount_ids[] }`.
+First message flagged `snapshot=true` seeds local book; ignore deltas beforehand.
+
+| Proto message                       | Why you need it                                 |                           |
+| ----------------------------------- | ----------------------------------------------- | ------------------------- |
+| `StreamOrderbookUpdate`             | Level-3 add/update/remove                       |                           |
+| `StreamOrderbookFill` / `ClobMatch` | Executed trades                                 |                           |
+| `StreamSubaccountUpdate`            | Balances, positions                             |                           |
+| `StreamTakerOrder`                  | Informational — every taker entering match loop | ([docs.dydx.exchange][3]) |
+
+Python stubs ship pre-generated on PyPI as **`v4-proto`**. ([PyPI][4])
+
+---
+
+## 3  Order model essentials
+
+| Field                | Values / subtleties                                                                            |                                                    |                         |
+| -------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------- |
+| **Order class**      | *Short-term* (latency-sensitive, in-mem ≤20 blocks) vs *Stateful* (on-chain; survive restarts) |                                                    |                         |
+| **`OrderType` enum** | LIMIT, MARKET, STOP_{LIMIT                                                                      | MARKET}, TAKE_PROFIT_{LIMIT                        | MARKET}, TRAILING_STOP |
+| **`TimeInForce`**    | GTT, IOC, FOK, Post-Only, default (maker-then-add)                                             |                                                    |                         |
+| **Status**           | OPEN, FILLED, CANCELED, plus optimistic `BEST_EFFORT_*`                                        | ([docs.dydx.exchange][5], [docs.dydx.exchange][6]) |                         |
+
+---
+
+## 4  Rate-limits & self-discovery
+
+*Live config endpoint*
+`GET <REST_NODE>/dydxprotocol/clob/block_rate`
+
+Example snippet:
+
+```json
+{
+  "block_rate_limit_config": {
+    "max_stateful_orders_per_n_blocks": [
+      {"num_blocks": 1,   "limit": 2},
+      {"num_blocks": 100, "limit": 20}
+    ],
+    "max_short_term_orders_and_cancels_per_n_blocks":[
+      {"num_blocks": 5, "limit": 2000}
+    ]
+  }
+}
+```
+
+Limits are **account-wide** (all sub-accounts aggregated).
+
+---
+
+## 5  Permissioned Keys (advanced auth)
+
+Extension of Cosmos `auth` module — compose verifiers:
+
+* `SignatureVerification`
+* `MessageFilter`
+* `SubaccountFilter`
+* `ClobPairIdFilter`
+* Combinators `AnyOf`, `AllOf`
+
+Typical flow: institution delegates `MsgPlaceOrder` only, caps notional via `MessageFilter`.
+
+---
+
+## 6  Node configuration for latency-sensitive trading
+
+Add/verify in `app.toml` / `config.toml`:
+
+```toml
+[grpc]
+enable = true          # enables port 9090
+
+[clob]
+grpc_streaming_flush_interval_ms = 50
+
+websocket_streaming_port = 9092  # dedicated low-latency WS
+```
+
+See full validator checklist in **Required Node Configs**.
+
+---
+
+## 7  Implementation checklist for your Rust crate
+
+1. **Code-gen protos**
+
+   ```bash
+   git clone https://github.com/dydxprotocol/v4-chain
+   cd v4-chain && make proto-gen && make proto-export-deps
+   ```
+
+2. Map integer *quantums* ↔ human units (`dydxprotocol.math`).
+
+3. Persist WS `message_id` / gRPC `block_height` for deterministic replay.
+
+4. Benchmark `StreamOrderbookUpdate` path; tune `grpc_streaming_flush_interval_ms`.
+
+5. Expose async Python façade via `pyo3` so strategy code stays unchanged.
+
+---
+
+## 8  Why REST still matters
+
+* Backed by read-replicas → ~1 s behind WS/gRPC.
+* Ideal for historical candles, funding, insurance fund, governance, tax exports.
+* Adapter should dual-path: **trade logic on WS/gRPC; analytics on REST**.
+
+---
+
+## 9  Extra guard-rails
+
+* **Withdrawal gate**: default cap `max(10 % TVL, $10 M)` per day (governance-tunable).
+* **Finality**: only fills with `execModeFinalize=true` are block-confirmed; re-orgs may revert optimistic matches.
+* Non-standard gRPC ports **not supported** — stick to 9090 (gRPC) and 9092 (low-lat WS).
+
+---
+
+## 🔗 Primary documentation links (open via citation markers)
+
+1. Indexer REST API schema ([docs.dydx.exchange][1])
+2. Indexer WebSocket doc ([docs.dydx.exchange][2])
+3. Full-node gRPC / WS streaming ([docs.dydx.exchange][3])
+4. Order Types / TimeInForce ([docs.dydx.exchange][6])
+5. Short-term vs Stateful orders ([docs.dydx.exchange][5])
+6. Rate Limits reference ([docs.dydx.exchange][8])
+7. Permissioned Keys guide ([docs.dydx.exchange][9])
+8. Required Node Configs ([docs.dydx.exchange][7])
+9. `v4-proto` PyPI package ([PyPI][4])
+
+---
+
+### Need code snippets next?
+
+Tell me which layer (REST, WS, gRPC) or helper (order-book merge, auth signer, proto converter) you want and I’ll drop the full function in English.
+
+[1]: https://docs.dydx.exchange/api_integration-indexer/indexer_api "Schemas · dYdX · v4"
+[2]: https://docs.dydx.exchange/api_integration-indexer/indexer_websocket "Indexer Websocket Documentation · dYdX · v4"
+[3]: https://docs.dydx.exchange/api_integration-full-node-streaming "Full Node gRPC Streaming · dYdX · v4"
+[4]: https://pypi.org/project/v4-proto/?utm_source=chatgpt.com "v4-proto - PyPI"
+[5]: https://docs.dydx.exchange/api_integration-trading/short_term_vs_stateful "Short Term Vs Stateful · dYdX · v4"
+[6]: https://docs.dydx.exchange/api_integration-trading/order_types "Order Execution Options · dYdX · v4"
+[7]: https://docs.dydx.exchange/infrastructure_providers-validators/required_node_configs "Required Node Configs · dYdX · v4"
+[8]: https://docs.dydx.exchange/api_integration-trading/rate_limits "Rate Limits · dYdX · v4"
+[9]: https://docs.dydx.exchange/api_integration-guides/how_to_permissioned_keys "Permissioned Keys · dYdX · v4"
