@@ -11,6 +11,7 @@ The README outlines a three-phase approach:
 ## References and Links
 - The README indicates that this repository integrates dYdX with Nautilus Trader.
 - Commit `84738a4` references a merge of pull request `#1` titled "Add basic implementation plan".
+- Pull request [`#2610`](https://github.com/nautechsystems/nautilus-trader/pull/2610) introduces a new OKX port for Nautilus Trader.
 - The commit history does not reference other repositories or PRs with additional details.
 - There are no other files or documentation in this repository at this time.
 
