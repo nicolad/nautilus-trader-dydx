@@ -81,3 +81,16 @@ This diagram summarizes the planned progression:
 1. **Phase 1** introduces typed transport clients in Rust for HTTP, WebSocket, and gRPC communication with dYdX.
 2. **Phase 2** exposes these clients to Python via `pyo3`, routing market data through the Rust implementation.
 3. **Phase 3** completes the port by implementing all adapter components in Rust, enabling Nautilus Trader to interact with dYdX end-to-end without Python in the critical path.
+
+## Repository Notes
+
+The current adapter includes simple HTTP, WebSocket, and gRPC clients written in
+Python. These will be replaced by typed Rust equivalents as development
+progresses.
+
+- Commit `84738a4` merged pull request `#1` titled "Add basic implementation plan".
+- Pull request [#2610](https://github.com/nautechsystems/nautilus-trader/pull/2610)
+  in the main Nautilus Trader repository demonstrates a similar port for the OKX
+  exchange.
+- No remote repository is configured for this project at present (`git remote -v`
+  outputs nothing).
