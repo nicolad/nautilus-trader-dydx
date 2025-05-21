@@ -18,3 +18,5 @@ Below is a high-level TODO list for the planned work:
   - Re-implement `InstrumentProvider`, `DataClient`, and `ExecutionClient` entirely in Rust.
   - Refactor order submission with dedicated methods for short-term, long-term, and conditional orders.
   - Run soak and latency tests and publish example strategies and docs.
+
+A practical approach is to begin development in a dedicated `dydx` crate that is kept outside the main production path. Once the crate stabilizes, we can replace the existing Python clients with their Rust equivalents. The final step is to implement the `InstrumentProvider`, `DataClient`, and `ExecutionClient` in Rust so the adapter runs end-to-end without Python.
