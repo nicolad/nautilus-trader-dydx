@@ -15,13 +15,25 @@ This document outlines a proposed plan to port Nautilus Trader to support the OK
 
 ### 2. Set Up Rust Crates
 1. Create new Rust crates for `okx_http`, `okx_ws`, and `okx_grpc` based on the dYdX transport clients.
+   - Each crate should expose a lightweight asynchronous API built on `reqwest` and `tokio`.
+   - Include reusable error types so failures are handled consistently across the adapter.
 2. Implement strongly typed request/response structs matching the OKX API.
+   - Model WebSocket channels as enum variants with precise payload structs.
+   - Provide conversion helpers to map between OKX order formats and the internal Nautilus Trader types.
 3. Provide exhaustive unit tests and benchmarks for each client.
+   - Use mocked servers to ensure deterministic test behaviour.
+   - Benchmark the core serialization and network routines to catch regressions early.
 
 ### 3. Expose Rust APIs to Python
 1. Use `pyo3` to generate Python bindings for the Rust transport clients.
 2. Ensure the build system compiles these bindings as part of the Python package.
 3. Validate the bindings with example scripts that exercise REST and WebSocket calls.
+
+### 3a. Rust Port Guidelines
+1. Organize each crate with a clear module hierarchy separating models, clients, and utilities.
+2. Favor asynchronous tasks to maximize throughput when streaming market data or submitting orders.
+3. Where possible, mirror the method names and semantics of the existing Python adapter so the higher-level logic remains unchanged.
+4. Document each public function with examples to guide future contributors.
 
 ### 4. Implement Adapter Components in Rust
 1. Recreate `InstrumentProvider`, `MarketDataClient`, `DataClient`, and `ExecutionClient` in Rust, mirroring the dYdX port structure.
