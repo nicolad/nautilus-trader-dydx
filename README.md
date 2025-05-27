@@ -89,7 +89,7 @@ Python. These will be replaced by typed Rust equivalents as development
 progresses.
 
 - Commit `84738a4` merged pull request `#1` titled "Add basic implementation plan".
-- Pull request [#2610](https://github.com/nautechsystems/nautilus-trader/pull/2610)
+- Pull request [#2610](https://github.com/nautechsystems/nautilus_trader/pull/2610)
   in the main Nautilus Trader repository demonstrates a similar port for the OKX
   exchange.
 - No remote repository is configured for this project at present (`git remote -v`
