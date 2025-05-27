@@ -566,6 +566,92 @@ See full validator checklist in **Required Node Configs**.
 
 ---
 
+
+# Using `v4-client-rs` to Accelerate the Migration
+
+The existing **`dydx` Rust crate** in `dydxprotocol/v4-clients/v4-client-rs` already delivers much of the “Phase 1” groundwork.  
+Below is how it fits the three-move plan, why it keeps the original safety-and-latency guarantees, and what still needs glue code.
+
+---
+
+## 1  Typed Transport Layer – Already Covered
+
+| Original Need                         | What the Crate Provides                                                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Strongly-typed async REST client      | `NodeClient` (transaction & account RPC)                                                                             |
+| Strongly-typed async WebSocket client | `IndexerSocket` (market-data stream)                                                                                 |
+| Strongly-typed async gRPC client      | `IndexerClient` (historical reads)                                                                                   |
+| One error enum, one trait surface     | `DydxError`, `WsError` plus builder pattern (`ClientBuilder`) unify call-sites                                       |
+| Signing, WS reconnects, telemetry     | Implemented (`Signer`, auto-reconnect, `metrics-exporter-tcp`)                                                       |
+
+### Why This Still Meets the Goal
+* **Compile-time safety** – All structs generated from v4 protobufs; endpoint or field changes force a compile error.  
+* **Performance** – Async, zero-copy, telemetry hooks already present; you only add `criterion` benches for drift detection.  
+* **Single source of truth** – Signing, back-off, reconnects live here; no duplication across higher layers.
+
+---
+
+## 2  Python Bridge (Read-Only) – Unchanged Plan
+
+* Wrap `IndexerClient` & `IndexerSocket` with `pyO3`.
+* Gate rollout behind `USE_RUST_TRANSPORTS`.
+* Measured overheads remain:
+
+| Overhead Source | Cost | Acceptable Because |
+| --------------- | ---- | ------------------ |
+| GIL hop         | +2-3 µs per call | Negligible on 50 KB book deltas |
+| Extra heap copy | 1 allocation | Noise on kilobyte frames |
+| Enum → `PyErr`  | loss of sub-code | Read path only |
+| musl wheels     | +minutes CI | One-time pipeline cost |
+
+Orders still **never** cross the Python boundary; latency budget there is too tight.
+
+---
+
+## 3  Full Rust Adapter – Work Remaining
+
+| Component          | Action Needed                                                             |
+| ------------------ | ------------------------------------------------------------------------- |
+| InstrumentProvider | Already covered by `IndexerClient`; wrap cache + TTL layer if desired.    |
+| DataClient         | Use `IndexerClient` gRPC stream; keep HTTP fallback behind `features`.    |
+| ExecutionClient    | Build wrapper crate (`execution_ext`) → define builders: <br>  • `send_short_term_limit`<br>  • `send_long_term_limit`<br>  • `send_conditional`<br>Each builds proto, sets idempotency key, calls `NodeClient::broadcast_tx`. |
+
+### Guarantees Preserved
+* Compile-time order invariants (price/trigger cannot be `None`).
+* Idempotency key + Prometheus histogram for order-ack latency.
+
+---
+
+## 4  Validation Gates to Keep
+
+* Add `criterion` benches in `benches/` for every public call.  
+* 24 h soak (live ticks + synthetic orders) logs P50/P95/P99 + heap.  
+* `cargo-fuzz` on JSON / protobuf decoders.  
+* `cargo miri` on unsafe blocks (few in this crate, but still).  
+* `cargo audit` + `pip audit` in CI.
+
+---
+
+## 5  Glue Work Checklist
+
+- [ ] Wrap HTTP/WS builders with `tower::limit::RateLimit`.  
+- [ ] Add crate `features = ["minimal"]` to drop Faucet/Noble code in slim builds.  
+- [ ] Publish `.pyi` stubs and map `DydxError.code` into Python exception attr.  
+- [ ] Implement execution builders with compile-time field enforcement.  
+- [ ] Wire nightly latency bench job.
+
+---
+
+## Net Gain
+
+* **Phase 1 engineering time drops by weeks** – transports already done.  
+* **Upstream support** – Nethermind maintains the crate; protocol bumps land faster than manual patches.  
+* **Security groundwork** – `cargo deny` and licence checks already configured.
+
+Adopting `v4-client-rs` keeps every original latency-and-safety objective while letting the team focus directly on the Python bridge, typed order builders, and perf testing.
+
+
+
 ## 🔗 Primary documentation links (open via citation markers)
 
 1. Indexer REST API schema ([docs.dydx.exchange][1])
