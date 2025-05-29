@@ -38,24 +38,7 @@ graph TD
     IP -- instruments --> TN
 ```
 
-<!-- 2 · Order Classification & Life-cycle -->
-```mermaid
-flowchart TD
-    A[New Order] -->|default| B[Short-term<br>(in-block)]
-    A -->|DYDXOrderTags<br>is_short_term_order = false| C[Long-term]
 
-    %% short-term branch
-    B -->|optional: num_blocks_open| B1[Expires after N blocks]
-    B --> B2[Committed only<br>fill & expiry]
-
-    %% long-term branch
-    C --> D{Conditional?}
-    D -->|Yes&nbsp;(STOP_*)| C1[Long-term<br>Conditional]
-    D -->|No| C2[Long-term<br>Regular]
-
-    %% terminal
-    B1 & B2 & C1 & C2 --> E[Filled / Cancelled / Expired]
-```
 
 <!-- 3 · End-to-End Order Submission Sequence -->
 ```mermaid
@@ -130,6 +113,8 @@ classDiagram
     VolatilityMarketMakerConfig --> BarType
 
 ```
+
+```md
 nautilus_trader/
 └── adapters/
     └── dydx/
@@ -142,3 +127,196 @@ nautilus_trader/
         ├── grpc/account.py      ◀─ DYDXAccountGRPCAPI
         ├── providers.py         ◀─ DYDXInstrumentProvider
         └── … (configs, enums, etc.)
+```
+
+
+Below are the seven Mermaid diagrams wrapped in Markdown code-blocks, ready to paste straight into any renderer that supports Mermaid.
+
+### 1 · Package / module overview
+
+```mermaid
+graph TD
+    subgraph nautilus_trader.adapters
+        A[dydx]
+    end
+
+    A --> B[dydx.config]
+    A --> C[dydx.factories]
+    A --> D[dydx.common.enums]
+    A --> E[dydx.providers]
+    A --> F[dydx.data]
+    A --> G[dydx.execution]
+```
+
+### 2 · Config module
+
+```mermaid
+classDiagram
+    class DydxAdapterConfig {
+        +DydxRESTConfig rest
+        +DydxWebSocketConfig ws
+        +bool demo
+        +str account_id
+        +validate()
+    }
+
+    class DydxRESTConfig {
+        +str api_key
+        +str api_secret
+        +str passphrase
+        +str endpoint
+    }
+
+    class DydxWebSocketConfig {
+        +str endpoint
+        +list~str~ channels
+        +int ping_interval
+    }
+
+    DydxAdapterConfig *-- DydxRESTConfig : embeds
+    DydxAdapterConfig *-- DydxWebSocketConfig : embeds
+```
+
+### 3 · Factories module
+
+```mermaid
+classDiagram
+    class DydxInstrumentFactory {
+        +create_from_rest(json)
+        +create_from_ws(json)
+    }
+
+    class DydxOrderFactory {
+        +create_limit(side, price, size)
+        +create_market(side, size)
+        +create_cancel(order_id)
+    }
+
+    class DydxAccountFactory {
+        +create_from_rest(json)
+        +create_from_ws(json)
+    }
+
+    DydxInstrumentFactory <|-- BaseInstrumentFactory
+    DydxOrderFactory <|-- BaseOrderFactory
+    DydxAccountFactory <|-- BaseAccountFactory
+```
+
+### 4 · Enums module
+
+```mermaid
+classDiagram
+    class DydxSide {
+        <<enumeration>>
+        +BUY
+        +SELL
+    }
+
+    class DydxOrderType {
+        <<enumeration>>
+        +LIMIT
+        +MARKET
+        +STOP_LIMIT
+        +STOP_MARKET
+    }
+
+    class DydxOrderStatus {
+        <<enumeration>>
+        +OPEN
+        +FILLED
+        +PARTIALLY_FILLED
+        +CANCELED
+        +REJECTED
+    }
+```
+
+### 5 · Providers module
+
+```mermaid
+classDiagram
+    class DydxRESTMarketDataProvider {
+        +get_ticker(instrument)
+        +get_order_book(instrument, depth)
+        +get_trades(instrument, since)
+    }
+
+    class DydxWebSocketMarketDataProvider {
+        +subscribe_ticker(instrument)
+        +subscribe_order_book(instrument, depth)
+        +subscribe_trades(instrument)
+        +disconnect()
+    }
+
+    class MarketDataEvent {
+        +datetime ts
+        +str type
+        +dict payload
+    }
+
+    DydxRESTMarketDataProvider --> MarketDataEvent : emits
+    DydxWebSocketMarketDataProvider --> MarketDataEvent : emits
+```
+
+### 6 · Data module
+
+```mermaid
+classDiagram
+    class DydxInstrument {
+        +str symbol
+        +str base
+        +str quote
+        +int price_precision
+        +int size_precision
+    }
+
+    class DydxTrade {
+        +datetime ts
+        +float price
+        +float size
+        +DydxSide side
+    }
+
+    class DydxOrderBookSnapshot {
+        +datetime ts
+        +list~Level~ bids
+        +list~Level~ asks
+    }
+
+    class Level {
+        +float price
+        +float size
+    }
+
+    DydxOrderBookSnapshot "*" --> Level : contains
+    DydxTrade --> DydxSide : uses
+```
+
+### 7 · Execution module
+
+```mermaid
+classDiagram
+    class DydxExecutionService {
+        +send(order_request)
+        +cancel(order_id)
+        +replace(order_id, new_qty, new_price)
+        +ws_handler(message)
+    }
+
+    class DydxOrderRequest {
+        +str client_id
+        +DydxOrderType type
+        +DydxSide side
+        +float qty
+        +float price
+    }
+
+    class DydxOrderResponse {
+        +str exchange_order_id
+        +DydxOrderStatus status
+        +str reason
+    }
+
+    DydxExecutionService --> DydxOrderRequest : submits
+    DydxExecutionService --> DydxOrderResponse : returns
+    DydxOrderResponse --> DydxOrderStatus : conveys
+```
