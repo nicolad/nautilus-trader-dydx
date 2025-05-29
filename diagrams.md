@@ -130,3 +130,15 @@ classDiagram
     VolatilityMarketMakerConfig --> BarType
 
 ```
+nautilus_trader/
+└── adapters/
+    └── dydx/
+        ├── __init__.py          ◀─ ENTRY-POINT (re-exports everything below)
+        ├── factories.py         ◀─ DYDXLiveDataClientFactory / DYDXLiveExecClientFactory
+        ├── data.py              ◀─ DYDXDataClient
+        ├── execution.py         ◀─ DYDXExecutionClient
+        ├── websocket/client.py  ◀─ DYDXWebsocketClient
+        ├── http/client.py       ◀─ DYDXHttpClient
+        ├── grpc/account.py      ◀─ DYDXAccountGRPCAPI
+        ├── providers.py         ◀─ DYDXInstrumentProvider
+        └── … (configs, enums, etc.)
