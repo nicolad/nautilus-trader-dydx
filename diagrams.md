@@ -76,3 +76,57 @@ sequenceDiagram
     CHAIN-->>EC: fill event (WebSocket)
     EC-->>N: state = FILLED
 ```
+
+
+```mermaid
+classDiagram
+    %% Core node and its configuration
+    class TradingNode {
+        +run()
+        +dispose()
+        +add_data_client_factory()
+        +add_exec_client_factory()
+    }
+    class TradingNodeConfig
+    TradingNode --> TradingNodeConfig
+
+    class LoggingConfig
+    TradingNodeConfig --> LoggingConfig
+
+    class LiveExecEngineConfig
+    TradingNodeConfig --> LiveExecEngineConfig
+
+    class CacheConfig
+    TradingNodeConfig --> CacheConfig
+
+    %% Connectivity: data + execution
+    class DYDXDataClientConfig
+    class DYDXExecClientConfig
+    TradingNodeConfig --> DYDXDataClientConfig
+    TradingNodeConfig --> DYDXExecClientConfig
+
+    %% Factories registered on the node
+    class DYDXLiveDataClientFactory
+    class DYDXLiveExecClientFactory
+    TradingNode --> DYDXLiveDataClientFactory
+    TradingNode --> DYDXLiveExecClientFactory
+
+    %% Trader and strategy stack
+    class Trader {
+        +add_strategy()
+    }
+    TradingNode --> Trader
+
+    class VolatilityMarketMaker
+    Trader --> VolatilityMarketMaker
+
+    class VolatilityMarketMakerConfig
+    VolatilityMarketMaker --> VolatilityMarketMakerConfig
+
+    %% Strategy–specific identifiers
+    class InstrumentId
+    class BarType
+    VolatilityMarketMakerConfig --> InstrumentId
+    VolatilityMarketMakerConfig --> BarType
+
+```
