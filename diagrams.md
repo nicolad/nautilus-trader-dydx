@@ -320,3 +320,192 @@ classDiagram
     DydxExecutionService --> DydxOrderResponse : returns
     DydxOrderResponse --> DydxOrderStatus : conveys
 ```
+
+##### 1. File-/Module-level map (flowchart TD)
+
+```mermaid
+flowchart TD
+    subgraph "nautilus_trader.adapters.dydx"
+        A[__init__.py<br/>(re-exports)]
+        B[config.py<br/>DydxConfig]
+        C[common/*<br/>constants & helpers]
+        D[endpoints/*<br/>(URL builders)]
+        E[http/*<br/>HTTP client]
+        F[websocket/*<br/>WS client]
+        G[schemas/*<br/>Pydantic ↔ core]
+        H[data.py<br/>Market-data adapters]
+        I[execution.py<br/>Order logic]
+        J[factories.py<br/>DydxAdapterFactory]
+        K[providers.py<br/>DydxExchangeAdapter]
+    end
+
+    A --> K
+    J --> K
+    K --> B
+    K --> C
+    K --> D
+    K --> E
+    K --> F
+    K --> G
+    K --> H
+    K --> I
+    D --> E
+    D --> F
+```
+
+##### 2. Runtime initialisation (sequence diagram)
+
+```mermaid
+sequenceDiagram
+    participant Strategy
+    participant Adapter as DydxExchangeAdapter
+    participant HTTP as HttpClient
+    participant WS as WebSocketClient
+    participant DXREST as dYdX REST API
+    participant DXWS   as dYdX WS API
+
+    Strategy->>Adapter: connect()
+    Adapter->>HTTP: start()
+    Adapter->>WS: start()
+    HTTP->>DXREST: GET /accounts
+    DXREST-->>HTTP: balances
+    HTTP-->>Adapter: balances normalised
+    WS->>DXWS: SUBSCRIBE trades,orders
+    DXWS-->>WS: stream frames
+    WS-->>Adapter: envelopes (raw)
+    Adapter-->>Strategy: domain events via bus
+```
+
+##### 3. Live data / order-flow (left-to-right flowchart)
+
+```mermaid
+flowchart LR
+    subgraph "dYdX"
+        A1[WebSocket stream] -->|JSON frames| B1[Deserializer]
+        A2[REST endpoint] ---.
+    end
+
+    B1 --> C[Normalizer<br/>(schemas/*)]
+    A2 -.-> C
+
+    C --> D[MessageBus]
+    D --> E[Strategy]
+    E --> F[OrderIntent]
+    F --> G[OrderRouter<br/>(execution.py)]
+    G --> H[HttpClient] & I[WebSocketClient]
+    H -->|REST: place order| A2
+    I -->|WS: private| A1
+    D <-- G
+```
+
+```mermaid
+graph TD
+    %% ────── dYdX adapter entry-point ──────
+    EP["nautilus_trader.adapters.dydx<br/>__init__.py<br/>(entry-point)"]
+
+    EP --> F1[DYDXLiveDataClientFactory]
+    EP --> F2[DYDXLiveExecClientFactory]
+    EP --> C1[DYDXDataClientConfig]
+    EP --> C2[DYDXExecClientConfig]
+    EP --> P[DYDXInstrumentProvider]
+
+    %% ────── Factories build clients ──────
+    subgraph "Factory build-time graph"
+        F1 --> DC[DYDXDataClient]
+        F2 --> EC[DYDXExecutionClient]
+
+        DC --> HC[DYDXHttpClient]
+        DC --> WS[DYDXWebsocketClient]
+
+        EC --> HC
+        EC --> WS
+        EC --> GRPC[DYDXAccountGRPCAPI]
+
+        DC --> P
+        EC --> P
+    end
+
+    %% ────── Typical live script wiring ──────
+    MM["examples/live/dydx/<br/>dydx_market_maker.py"] --> TN[TradingNode]
+    TN -->|add_data_client_factory("DYDX", …)| F1
+    TN -->|add_exec_client_factory("DYDX", …)| F2
+```
+##### 1. File-/Module-level map
+
+```mermaid
+flowchart TD
+    subgraph "nautilus_trader.adapters.dydx"
+        A[__init__.py<br/>(re-exports)]
+        B[config.py<br/>DydxConfig]
+        C[common/*<br/>constants & helpers]
+        D[endpoints/*<br/>(URL builders)]
+        E[http/*<br/>HTTP client]
+        F[websocket/*<br/>WebSocket client]
+        G[schemas/*<br/>Pydantic ↔ core]
+        H[data.py<br/>Market-data adapters]
+        I[execution.py<br/>Order logic]
+        J[factories.py<br/>DydxAdapterFactory]
+        K[providers.py<br/>DydxExchangeAdapter]
+    end
+
+    A --> K
+    J --> K
+    K --> B
+    K --> C
+    K --> D
+    K --> E
+    K --> F
+    K --> G
+    K --> H
+    K --> I
+    D --> E
+    D --> F
+```
+
+##### 2. Runtime initialisation
+
+```mermaid
+sequenceDiagram
+    participant Strategy
+    participant Adapter as "DydxExchangeAdapter"
+    participant HTTP    as "HttpClient"
+    participant WS      as "WebSocketClient"
+    participant DXREST  as "dYdX REST API"
+    participant DXWS    as "dYdX WS API"
+
+    Strategy  ->> Adapter: connect()
+    Adapter   ->> HTTP:   start()
+    Adapter   ->> WS:     start()
+    HTTP      ->> DXREST: GET /accounts
+    DXREST    -->> HTTP:  balances
+    HTTP      -->> Adapter: balances normalised
+    WS        ->> DXWS:   SUBSCRIBE trades, orders
+    DXWS      -->> WS:    stream frames
+    WS        -->> Adapter: envelopes (raw)
+    Adapter   -->> Strategy: domain events via bus
+```
+
+##### 3. Live data & order-flow
+
+```mermaid
+flowchart LR
+    subgraph "dYdX"
+        A1[WebSocket stream] -->|JSON frames| B1[Deserializer]
+        A2[REST endpoint]
+    end
+
+    B1 --> C[Normalizer<br/>(schemas/*)]
+    A2 -.-> C
+
+    C --> D[MessageBus]
+    D --> E[Strategy]
+    E --> F[OrderIntent]
+    F --> G[OrderRouter<br/>(execution.py)]
+    G --> H[HttpClient]
+    G --> I[WebSocketClient]
+    H -->|REST place order| A2
+    I -->|WS private| A1
+    G --> D
+```
+
+
