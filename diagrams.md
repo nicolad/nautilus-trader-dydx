@@ -59,21 +59,20 @@ graph TD
 
 ---
 
-## 3. File / Module-level Map
 ```mermaid
 flowchart TD
-    subgraph "nautilus_trader.adapters.dydx"
-        A[__init__.py<br/>(re-exports)]
-        B[config.py<br/>DydxConfig]
-        C[common/*<br/>constants & helpers]
-        D[endpoints/*<br/>(URL builders)]
-        E[http/*<br/>HTTP client]
-        F[websocket/*<br/>WebSocket client]
-        G[schemas/*<br/>Pydantic ↔ core]
-        H[data.py<br/>Market-data adapters]
-        I[execution.py<br/>Order logic]
-        J[factories.py<br/>DydxAdapterFactory]
-        K[providers.py<br/>DydxExchangeAdapter]
+    subgraph cluster_dydx["nautilus_trader.adapters.dydx"]
+        A["__init__.py<br/>(re-exports)"]
+        B["config.py<br/>DydxConfig"]
+        C["common/*<br/>constants & helpers"]
+        D["endpoints/*<br/>(URL builders)"]
+        E["http/*<br/>HTTP client"]
+        F["websocket/*<br/>WebSocket client"]
+        G["schemas/*<br/>Pydantic <-> core"]
+        H["data.py<br/>Market-data adapters"]
+        I["execution.py<br/>Order logic"]
+        J["factories.py<br/>DydxAdapterFactory"]
+        K["providers.py<br/>DydxExchangeAdapter"]
     end
 
     A --> K
@@ -89,6 +88,7 @@ flowchart TD
     D --> E
     D --> F
 ```
+
 
 ---
 
