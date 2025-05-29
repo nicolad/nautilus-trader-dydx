@@ -117,26 +117,29 @@ sequenceDiagram
 ---
 
 ## 5. Live Data & Order-Flow
+
 ```mermaid
-flowchart LR
-    subgraph "dYdX"
+flowchart TB
+    %% inbound streams from exchange
+    subgraph dydx
         A1[WebSocket stream] -->|JSON frames| B1[Deserializer]
         A2[REST endpoint]
     end
 
-    B1 --> C[Normalizer<br/>(schemas/*)]
+    B1 --> C["Normalizer<br/>(schemas/*)"]
     A2 -.-> C
 
     C --> D[MessageBus]
     D --> E[Strategy]
     E --> F[OrderIntent]
-    F --> G[OrderRouter<br/>(execution.py)]
+    F --> G["OrderRouter<br/>(execution.py)"]
     G --> H[HttpClient]
     G --> I[WebSocketClient]
     H -->|REST place order| A2
     I -->|WS private| A1
     G --> D
 ```
+
 
 ---
 
